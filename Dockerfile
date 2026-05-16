@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG CUDA_VERSION=13.0.2
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu24.04
 
 ARG FORGE_REPO=https://github.com/Haoming02/sd-webui-forge-classic.git
 ARG FORGE_BRANCH=neo
@@ -116,4 +116,3 @@ RUN chmod +x /usr/local/bin/start-forge \
 WORKDIR /opt/forge-neo
 EXPOSE 7860 8888
 CMD ["start-forge"]
-
