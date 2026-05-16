@@ -116,6 +116,9 @@ RUN chmod +x /usr/local/bin/start-forge \
     && mkdir -p /data/models/Stable-diffusion /data/models/Lora /data/models/VAE /data/models/embeddings /data/output /data/config /data/tmp/gradio \
     && python -c "import sys, importlib.metadata as m; print(sys.version); print('torch', m.version('torch')); print('sageattention', m.version('sageattention'))"
 
+LABEL org.opencontainers.image.source=https://github.com/AnqiPudding/forge-neo-modal-deploy
+LABEL org.opencontainers.image.description="Forge-Neo Modal image with Python 3.13, SageAttention, and baked extensions"
+
 WORKDIR /opt/forge-neo
 EXPOSE 7860 8888
 CMD ["start-forge"]

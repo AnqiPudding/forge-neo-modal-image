@@ -26,9 +26,7 @@ jobs:
         shell: bash
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
-          repo="${GITHUB_REPOSITORY#*/}"
-          repo="${repo,,}"
-          echo "IMAGE_NAME=ghcr.io/${owner}/${repo}" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=ghcr.io/${owner}/forge-neo-modal-deploy" >> "$GITHUB_ENV"
 
       - name: Free runner disk
         shell: bash
@@ -65,7 +63,6 @@ jobs:
           provenance: false
           sbom: false
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
           cache-from: type=gha

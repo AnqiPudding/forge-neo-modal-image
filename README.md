@@ -5,7 +5,7 @@ Private image-builder repo for Forge-Neo on Modal.
 The workflow publishes:
 
 ```text
-ghcr.io/anqipudding/forge-neo-modal-image:latest
+ghcr.io/anqipudding/forge-neo-modal-deploy:latest
 ```
 
 The image bakes in:
@@ -22,5 +22,4 @@ The image bakes in:
 
 `start-forge` launches Forge with `--sage --cuda-malloc` and points models to `/data/models`.
 
-After the first successful workflow run, make the GHCR package public if other Modal accounts should deploy it without registry credentials.
-
+The Docker source stays in this private repo; the image is labeled against the public deploy-only repo so other Modal accounts can pull the public package without seeing the build files.
