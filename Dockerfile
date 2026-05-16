@@ -19,7 +19,7 @@ ARG TORCH_VERSION=2.12.0
 ARG TORCHVISION_VERSION=0.27.0
 ARG SAGE_REPO=https://github.com/thu-ml/SageAttention.git
 ARG SAGE_TAG=v2.2.0
-ARG SAGE_MAX_JOBS=8
+ARG SAGE_MAX_JOBS=1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -105,7 +105,10 @@ RUN grep -v -E '^torch([[:space:]]*$|[<=>].*)' requirements.txt > /tmp/requireme
 RUN uv pip install triton==3.6.0 \
     && git clone --depth 1 --branch "${SAGE_TAG}" "${SAGE_REPO}" /tmp/SageAttention \
     && cd /tmp/SageAttention \
-    && EXT_PARALLEL=4 NVCC_APPEND_FLAGS="--threads 8" MAX_JOBS="${SAGE_MAX_JOBS}" uv pip install --no-build-isolation . \
+    && sed -i 's/"--threads=8"/"--threads=1"/' setup.py \
+    && { while true; do echo "SageAttention build still running at $(date -Iseconds)"; sleep 60; done & heartbeat="$!"; \
+       trap 'kill "${heartbeat}" >/dev/null 2>&1 || true; wait "${heartbeat}" 2>/dev/null || true' EXIT; \
+       EXT_PARALLEL=1 MAX_JOBS="${SAGE_MAX_JOBS}" uv pip install -v --no-build-isolation /tmp/SageAttention; } \
     && rm -rf /tmp/SageAttention
 
 COPY scripts/start-forge.sh /usr/local/bin/start-forge
