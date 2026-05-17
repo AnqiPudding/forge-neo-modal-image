@@ -8,10 +8,11 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOCKERHUB_NAMESPACE: anqipudding
+  DOCKERHUB_REPOSITORY: forge-neo-modal-image
 
 jobs:
   build:
@@ -22,11 +23,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Normalize image name
+      - name: Normalize Docker Hub image name
         shell: bash
         run: |
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "IMAGE_NAME=ghcr.io/${owner}/forge-neo-modal-deploy" >> "$GITHUB_ENV"
+          namespace="${DOCKERHUB_NAMESPACE,,}"
+          repository="${DOCKERHUB_REPOSITORY,,}"
+          echo "DOCKERHUB_NAMESPACE=${namespace}" >> "$GITHUB_ENV"
+          echo "DOCKERHUB_REPOSITORY=${repository}" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=docker.io/${namespace}/${repository}" >> "$GITHUB_ENV"
 
       - name: Free runner disk
         shell: bash
@@ -38,12 +42,68 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Create Docker Hub repository
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          token="$(
+            curl -fsS https://hub.docker.com/v2/auth/token \
+              -H 'Content-Type: application/json' \
+              -d "{\"identifier\":\"${DOCKERHUB_USERNAME}\",\"secret\":\"${DOCKERHUB_TOKEN}\"}" \
+            | jq -r '.access_token'
+          )"
+
+          if [ -z "${token}" ] || [ "${token}" = "null" ]; then
+            echo "Docker Hub auth did not return an access token."
+            exit 1
+          fi
+
+          repo_url="https://hub.docker.com/v2/namespaces/${DOCKERHUB_NAMESPACE}/repositories/${DOCKERHUB_REPOSITORY}"
+          status="$(curl -sS -o /tmp/dockerhub-repo.json -w "%{http_code}" -H "Authorization: Bearer ${token}" "${repo_url}")"
+
+          if [ "${status}" = "200" ]; then
+            echo "Docker Hub repository already exists: ${IMAGE_NAME}"
+            exit 0
+          fi
+
+          if [ "${status}" != "404" ]; then
+            echo "Could not check Docker Hub repository. HTTP ${status}:"
+            cat /tmp/dockerhub-repo.json
+            exit 1
+          fi
+
+          payload="$(
+            jq -n \
+              --arg name "${DOCKERHUB_REPOSITORY}" \
+              --arg namespace "${DOCKERHUB_NAMESPACE}" \
+              --arg description "Forge-Neo Modal image" \
+              --arg full_description "Forge-Neo Modal image with Python 3.13, SageAttention, and baked extensions." \
+              '{name:$name, namespace:$namespace, registry:"docker.io", description:$description, full_description:$full_description, is_private:false}'
+          )"
+
+          create_status="$(
+            curl -sS -o /tmp/dockerhub-create.json -w "%{http_code}" \
+              -X POST "https://hub.docker.com/v2/namespaces/${DOCKERHUB_NAMESPACE}/repositories" \
+              -H "Authorization: Bearer ${token}" \
+              -H "Content-Type: application/json" \
+              -d "${payload}"
+          )"
+
+          if [ "${create_status}" != "201" ]; then
+            echo "Could not create Docker Hub repository. HTTP ${create_status}:"
+            cat /tmp/dockerhub-create.json
+            exit 1
+          fi
+
+          echo "Created Docker Hub repository: ${IMAGE_NAME}"
+
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
