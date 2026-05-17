@@ -114,16 +114,41 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
 
-      - name: Build and push
+      - name: Build OCI image archive
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
-          push: true
+          push: false
           provenance: false
           sbom: false
           tags: ${{ steps.meta.outputs.tags }}
+          outputs: type=oci,dest=/tmp/forge-neo-modal-image.oci.tar
           build-args: |
             BUILDKIT_INLINE_CACHE=1
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install regctl
+        shell: bash
+        run: |
+          curl -fsSL https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64 -o regctl
+          sudo install -m 755 regctl /usr/local/bin/regctl
+          regctl version
+
+      - name: Push image archive to Docker Hub
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          regctl registry login docker.io -u "${DOCKERHUB_USERNAME}" -p "${DOCKERHUB_TOKEN}"
+          regctl registry set --blob-chunk 20971520 --blob-max 104857600 docker.io
+
+          while IFS= read -r tag; do
+            if [ -n "${tag}" ]; then
+              echo "Importing ${tag}"
+              regctl image import "${tag}" /tmp/forge-neo-modal-image.oci.tar -v info
+            fi
+          done <<< "${TAGS}"
